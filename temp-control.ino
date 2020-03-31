@@ -1,8 +1,12 @@
 #include <AutoPID.h>
+#include <SPI.h>
+#include <MFRC522.h>
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
 #define TARGET 25 // °C
+#define SS_PIN 10
+#define RST_PIN 9
 
 /* Conversion */
 const int maxTempCalib1 = 510;
@@ -18,14 +22,14 @@ unsigned long iterations1 = 0;
 float poolValues1 = 0.0;
 float temp1 = 0;
 
-int scanTime1 = 1; // Seconds
+int scanTime1 = 2; // Seconds
 const int millisMultipler = 1000;
-const int offsetStart1 = 80; // [0-254]
+const int maxTemp = 100;
+
 
 /* PID */
 double Setpoint1, Input1 = 0, Output1 = 0;
-/* Define the aggressive and conservative Tuning Parameters */
-double aggKp1=4, aggKi1=0.2, aggKd1=1;
+/* Define the Tuning Parameters */
 double consKp1=4, consKi1=0.2, consKd1=1;
 
 /* Sensor Pins */
@@ -37,6 +41,11 @@ int pinOutput1 = 3;
 /* Specify the links and initial tuning parameters */
 AutoPID PID1(&Input1, &Setpoint1, &Output1, OUTPUT_MIN, OUTPUT_MAX, consKp1, consKi1, consKd1);
 
+MFRC522 rfid(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key; 
+
+byte nuidPICC[4];
+
 void setup() {
   Serial.begin(115200); 
   analogReference(INTERNAL);
@@ -47,10 +56,17 @@ void setup() {
 
   pinMode(signalPin, INPUT);
 
-  PID1.setBangBang(15);
-  PID1.setTimeStep(1000);
+  PID1.setBangBang(5);
+  PID1.setTimeStep(4000);
 
-  Setpoint1 = 100 - TARGET; // max temp - target temp
+  SPI.begin();
+  rfid.PCD_Init();
+
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+
+  Setpoint1 = maxTemp - TARGET;
 }
 
 void loop() {
@@ -63,6 +79,7 @@ void loop() {
   } else {
     scanTemp1();
     pid1();
+    readCard();
   }
 }
 
@@ -78,7 +95,7 @@ void scanTemp1() {
 
 void pid1() {
   if (temp1 != 0) {
-    Input1 = 100 - temp1;
+    Input1 = maxTemp - temp1;
     double gap = abs(Setpoint1 - Input1);
     PID1.run(); 
     Serial.println(temp1);
@@ -91,7 +108,72 @@ void pid1() {
 
 void ploter1() {
   if (actTime >= showPloterTimeout1) {
+    Serial.println ("T");
     Serial.println (temp1, 1);
+    Serial.println ("B");
     Serial.println (Output1, 1);
+  }
+}
+
+void readCard() {
+  // Reset the loop if no new card present on the sensor/reader. This saves the entire process when idle.
+  if ( ! rfid.PICC_IsNewCardPresent())
+    return;
+
+  // Verify if the NUID has been readed
+  if ( ! rfid.PICC_ReadCardSerial())
+    return;
+
+  Serial.print(F("PICC type: "));
+  MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
+  Serial.println(rfid.PICC_GetTypeName(piccType));
+
+  // Check is the PICC of Classic MIFARE type
+  if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
+    piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+    piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+    Serial.println(F("Your tag is not of type MIFARE Classic."));
+    return;
+  }
+
+  if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+    rfid.uid.uidByte[1] != nuidPICC[1] || 
+    rfid.uid.uidByte[2] != nuidPICC[2] || 
+    rfid.uid.uidByte[3] != nuidPICC[3] ) {
+    Serial.println(F("A new card has been detected."));
+
+    // Store NUID into nuidPICC array
+    for (byte i = 0; i < 4; i++) {
+      nuidPICC[i] = rfid.uid.uidByte[i];
+    }
+   
+    Serial.println(F("The NUID tag is:"));
+    Serial.print(F("In hex: "));
+    printHex(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+    Serial.print(F("In dec: "));
+    printDec(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+  }
+  else Serial.println(F("Card read previously."));
+
+  // Halt PICC
+  rfid.PICC_HaltA();
+
+  // Stop encryption on PCD
+  rfid.PCD_StopCrypto1();
+}
+
+void printHex(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i], HEX);
+  }
+}
+
+void printDec(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i], DEC);
   }
 }
