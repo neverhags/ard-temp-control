@@ -4,9 +4,18 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 25 // °C
+#define TARGET 27 // °C
 #define SS_PIN 10
 #define RST_PIN 9
+#define FAN_OFFSET 0
+#define SCAN_TIME 4 // Seconds
+#define BANG 5
+
+/* Sensor Pins */
+int positive1 = A0;
+int negative1 = A2;
+int signalPin = A1;
+int pinOutput1 = 3;
 
 /* Conversion */
 const int maxTempCalib1 = 510;
@@ -22,7 +31,7 @@ unsigned long iterations1 = 0;
 float poolValues1 = 0.0;
 float temp1 = 0;
 
-int scanTime1 = 2; // Seconds
+
 const int millisMultipler = 1000;
 const int maxTemp = 100;
 
@@ -30,13 +39,8 @@ const int maxTemp = 100;
 /* PID */
 double Setpoint1, Input1 = 0, Output1 = 0;
 /* Define the Tuning Parameters */
-double consKp1=4, consKi1=0.2, consKd1=1;
+double consKp1=8, consKi1=0.4, consKd1=2;
 
-/* Sensor Pins */
-int positive1 = A0;
-int negative1 = A2;
-int signalPin = A1;
-int pinOutput1 = 3;
 
 /* Specify the links and initial tuning parameters */
 AutoPID PID1(&Input1, &Setpoint1, &Output1, OUTPUT_MIN, OUTPUT_MAX, consKp1, consKi1, consKd1);
@@ -56,8 +60,8 @@ void setup() {
 
   pinMode(signalPin, INPUT);
 
-  PID1.setBangBang(5);
-  PID1.setTimeStep(4000);
+  PID1.setBangBang(BANG);
+  PID1.setTimeStep(5000);
 
   SPI.begin();
   rfid.PCD_Init();
@@ -74,8 +78,8 @@ void loop() {
   if (actTime >= readTempTimeout1) {
     temp1 = (poolValues1/iterations1);
     reset();
-    readTempTimeout1 = actTime + (millisMultipler * scanTime1);
     ploter1();
+    readTempTimeout1 = actTime + (millisMultipler * SCAN_TIME);
   } else {
     scanTemp1();
     pid1();
@@ -98,9 +102,7 @@ void pid1() {
     Input1 = maxTemp - temp1;
     double gap = abs(Setpoint1 - Input1);
     PID1.run(); 
-    Serial.println(temp1);
-    Serial.println(Output1);
-    if (Output1 > offsetStart1) {
+    if (Output1 > FAN_OFFSET) {
       analogWrite(pinOutput1, Output1);
     }
   }
@@ -108,10 +110,13 @@ void pid1() {
 
 void ploter1() {
   if (actTime >= showPloterTimeout1) {
-    Serial.println ("T");
-    Serial.println (temp1, 1);
-    Serial.println ("B");
+    Serial.print ("T");
+    Serial.print (temp1, 1);
+    Serial.print (",B");
     Serial.println (Output1, 1);
+    Serial.print (temp1, 1);
+    Serial.print (",");
+    Serial.println (Output1 / 10, 1);
   }
 }
 
@@ -124,7 +129,6 @@ void readCard() {
   if ( ! rfid.PICC_ReadCardSerial())
     return;
 
-  Serial.print(F("PICC type: "));
   MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
   Serial.println(rfid.PICC_GetTypeName(piccType));
 
@@ -132,7 +136,6 @@ void readCard() {
   if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
     piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
     piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-    Serial.println(F("Your tag is not of type MIFARE Classic."));
     return;
   }
 
