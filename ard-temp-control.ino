@@ -4,12 +4,13 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 27 // °C
+#define TARGET 26 // °C
 #define SS_PIN 10
 #define RST_PIN 9
-#define FAN_OFFSET 0
+#define FAN_OFFSET 5
 #define SCAN_TIME 4 // Seconds
 #define BANG 5
+#define SET_OFFSET_AS_MIN false
 
 /* Sensor Pins */
 int positive1 = A0;
@@ -39,7 +40,7 @@ const int maxTemp = 100;
 /* PID */
 double Setpoint1, Input1 = 0, Output1 = 0;
 /* Define the Tuning Parameters */
-double consKp1=8, consKi1=0.4, consKd1=2;
+double consKp1=4, consKi1=0.2, consKd1=1;
 
 
 /* Specify the links and initial tuning parameters */
@@ -104,6 +105,12 @@ void pid1() {
     PID1.run(); 
     if (Output1 > FAN_OFFSET) {
       analogWrite(pinOutput1, Output1);
+    } else {
+      if (SET_OFFSET_AS_MIN) {
+        analogWrite(pinOutput1, FAN_OFFSET);
+      } else {
+        analogWrite(pinOutput1, 0);
+      }
     }
   }
 }
@@ -111,12 +118,12 @@ void pid1() {
 void ploter1() {
   if (actTime >= showPloterTimeout1) {
     Serial.print ("T");
-    Serial.print (temp1, 1);
+    Serial.print (temp1, 2);
     Serial.print (",B");
-    Serial.println (Output1, 1);
-    Serial.print (temp1, 1);
+    Serial.println (Output1, 2);
+    Serial.print (temp1, 2);
     Serial.print (",");
-    Serial.println (Output1 / 10, 1);
+    Serial.println (Output1 / 10, 2);
   }
 }
 
