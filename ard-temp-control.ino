@@ -1,22 +1,27 @@
 #include <AutoPID.h>
 #include <SPI.h>
 #include <MFRC522.h>
+#include <EEPROM.h>
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
 #define TARGET 26 // °C
 #define SS_PIN 10
 #define RST_PIN 9
-#define FAN_OFFSET 5
+#define FAN_OFFSET 10
 #define SCAN_TIME 4 // Seconds
 #define BANG 5
-#define SET_OFFSET_AS_MIN false
+#define SET_OFFSET_AS_MIN true
 
 /* Sensor Pins */
 int positive1 = A0;
 int negative1 = A2;
 int signalPin = A1;
 int pinOutput1 = 3;
+
+/* Rele pins */
+int rele1 = 2;
+int rele2 = 4;
 
 /* Conversion */
 const int maxTempCalib1 = 510;
@@ -32,10 +37,11 @@ unsigned long iterations1 = 0;
 float poolValues1 = 0.0;
 float temp1 = 0;
 
-
+String inputString = "";
+bool stringComplete = false;
 const int millisMultipler = 1000;
 const int maxTemp = 100;
-
+bool isEEPROMEmpty = false;
 
 /* PID */
 double Setpoint1, Input1 = 0, Output1 = 0;
@@ -49,16 +55,18 @@ AutoPID PID1(&Input1, &Setpoint1, &Output1, OUTPUT_MIN, OUTPUT_MAX, consKp1, con
 MFRC522 rfid(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key; 
 
-byte nuidPICC[4];
+byte* nuidPICC;
 
 void setup() {
   Serial.begin(115200); 
   analogReference(INTERNAL);
   pinMode(positive1, OUTPUT);
   pinMode(negative1, OUTPUT);
+  pinMode(rele1, OUTPUT);
+  pinMode(rele2, OUTPUT);
   digitalWrite(positive1, HIGH);
   digitalWrite(negative1, LOW);
-
+ 
   pinMode(signalPin, INPUT);
 
   PID1.setBangBang(BANG);
@@ -79,7 +87,7 @@ void loop() {
   if (actTime >= readTempTimeout1) {
     temp1 = (poolValues1/iterations1);
     reset();
-    ploter1();
+    ploter1(); 
     readTempTimeout1 = actTime + (millisMultipler * SCAN_TIME);
   } else {
     scanTemp1();
@@ -145,20 +153,21 @@ void readCard() {
     piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
     return;
   }
+  
+  compareData(rfid.uid.uidByte, rfid.uid.size);
+  Serial.println(compareData(rfid.uid.uidByte, rfid.uid.size));
 
+  
   if (rfid.uid.uidByte[0] != nuidPICC[0] || 
     rfid.uid.uidByte[1] != nuidPICC[1] || 
     rfid.uid.uidByte[2] != nuidPICC[2] || 
     rfid.uid.uidByte[3] != nuidPICC[3] ) {
-    Serial.println(F("A new card has been detected."));
 
     // Store NUID into nuidPICC array
     for (byte i = 0; i < 4; i++) {
       nuidPICC[i] = rfid.uid.uidByte[i];
     }
    
-    Serial.println(F("The NUID tag is:"));
-    Serial.print(F("In hex: "));
     printHex(rfid.uid.uidByte, rfid.uid.size);
     Serial.println();
     Serial.print(F("In dec: "));
@@ -185,5 +194,50 @@ void printDec(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], DEC);
+  }
+}
+
+void releOn(int rele) {
+  digitalWrite(rele, LOW);
+}
+
+void releOff(int rele) {
+  digitalWrite(rele, HIGH);
+}
+
+void saveEEPROM(uint8_t* data) {
+  for (byte i = 0; i < 4; i++) {
+    EEPROM.put(i, data[i]);
+  }
+}
+
+bool compareData(uint8_t* inputData, byte bufferSize) {
+  isEEPROMEmpty = false;
+  byte emptyCounter = 0; 
+  for (uint8_t i = 0; i < 6; i++) {
+    if (EEPROM.read(i) != inputData[i]) {
+      if (EEPROM.read(i) == 0) {
+        emptyCounter++;
+      } else {
+        Serial.print("emptyCounter: ");
+        Serial.println(emptyCounter);
+        return false;
+      }
+    }
+  }
+  if(emptyCounter == 4) {
+    saveEEPROM(inputData);
+  }
+  return true;
+}
+
+
+void serialEvent() {
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    inputString += inChar;
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
   }
 }
