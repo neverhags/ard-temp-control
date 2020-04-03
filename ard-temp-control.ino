@@ -8,8 +8,9 @@
 #define TARGET 26 // °C
 #define SS_PIN 10
 #define RST_PIN 9
-#define FAN_OFFSET 10
+#define FAN_OFFSET 20
 #define SCAN_TIME 4 // Seconds
+#define DOOR_TIMEOUT 5
 #define BANG 5
 #define SET_OFFSET_AS_MIN true
 
@@ -31,6 +32,7 @@ const int minTempCalib1 = 670;
 unsigned long actTime = 0;
 unsigned long readTempTimeout1 = 0;
 unsigned long showPloterTimeout1 = 0;
+unsigned long openDoorTimeout = 0;
 
 /* Temp vars */
 unsigned long iterations1 = 0;
@@ -64,6 +66,8 @@ void setup() {
   pinMode(negative1, OUTPUT);
   pinMode(rele1, OUTPUT);
   pinMode(rele2, OUTPUT);
+  digitalWrite(rele1, HIGH);
+  digitalWrite(rele2, HIGH);
   digitalWrite(positive1, HIGH);
   digitalWrite(negative1, LOW);
  
@@ -90,6 +94,7 @@ void loop() {
     ploter1(); 
     readTempTimeout1 = actTime + (millisMultipler * SCAN_TIME);
   } else {
+    openDoor();
     scanTemp1();
     pid1();
     readCard();
@@ -154,8 +159,9 @@ void readCard() {
     return;
   }
   
-  compareData(rfid.uid.uidByte, rfid.uid.size);
-  Serial.println(compareData(rfid.uid.uidByte, rfid.uid.size));
+  if (compareData(rfid.uid.uidByte, rfid.uid.size)) {
+    openDoorTimeout = actTime + (DOOR_TIMEOUT * millisMultipler);
+  }
 
   
   if (rfid.uid.uidByte[0] != nuidPICC[0] || 
@@ -181,6 +187,14 @@ void readCard() {
 
   // Stop encryption on PCD
   rfid.PCD_StopCrypto1();
+}
+
+void openDoor() {
+  if (actTime >= openDoorTimeout) {
+    releOff(rele1);
+  } else {
+    releOn(rele1);
+  }
 }
 
 void printHex(byte *buffer, byte bufferSize) {
