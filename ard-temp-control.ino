@@ -5,19 +5,19 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 26 // °C
+#define TARGET 25 // °C
 #define SS_PIN 10
 #define RST_PIN 9
-#define FAN_OFFSET 10
+#define FAN_OFFSET 20
 #define SCAN_TIME 15 // Seconds
 #define SCAN_TIME_OFFSET 5
 #define DOOR_TIMEOUT 5
 #define BANG 5
-#define SET_OFFSET_AS_MIN false
+#define SET_OFFSET_AS_MIN true
 #define MILLIS_MULTIPLIER 1000
 
 /* Sensor Pins */
-int positive1 = A0;
+int positive1 = A0; 
 int negative1 = A2;
 int signalPin = A1;
 int pinOutput1 = 3;
@@ -30,8 +30,8 @@ int rele2 = 4;
 int door1 = 5;
 
 /* Conversion */
-const int maxTempCalib1 = 510;
-const int minTempCalib1 = 670;
+const int maxTempCalib1 = 855;
+const int minTempCalib1 = 638;
 
 /* Time vars */
 unsigned long actTime = 0;
@@ -54,7 +54,7 @@ double Setpoint1, Input1 = 0, Output1 = 0;
 double consKp1=4, consKi1=0.2, consKd1=1;
 
 /* Dark Mode */
-bool dark = false;
+bool dark = true;
 
 /* Specify the links and initial tuning parameters */
 AutoPID PID1(&Input1, &Setpoint1, &Output1, OUTPUT_MIN, OUTPUT_MAX, consKp1, consKi1, consKd1);
@@ -102,15 +102,15 @@ void loop() {
   readCard();
   stanDoor();
   scanSerial();
-}
+} 
 
 void reset() {
   poolValues1 = 0;
   iterations1 = 0;
 }
 
-void scanTemp1() {
-  poolValues1 += map(analogRead(1), maxTempCalib1, minTempCalib1, 1000,0) / 10;
+void scanTemp1() {    
+  poolValues1 += map(analogRead(1), maxTempCalib1, minTempCalib1, 1000, 0) / 10;
   iterations1++;
 }
 
