@@ -2,6 +2,8 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <EEPROM.h>
+#include <OneWire.h>
+#include <DS18B20.h>
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
@@ -18,8 +20,8 @@
 
 /* Sensor Pins */
 int positive1 = A0; 
-int negative1 = A2;
-int signalPin = A1;
+int negative1 = A2; // utility
+int signalPin = A1; // utility
 int pinOutput1 = 3;
 
 /* Rele pins */
@@ -62,10 +64,15 @@ AutoPID PID1(&Input1, &Setpoint1, &Output1, OUTPUT_MIN, OUTPUT_MAX, consKp1, con
 MFRC522 rfid(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key; 
 
+OneWire oneWire(signalPin);
+DS18B20 sensor(&oneWire);
+
 byte* nuidPICC;
 
 void setup() {
   Serial.begin(115200); 
+  Serial.println(__FILE__);
+   
   analogReference(INTERNAL);
   pinMode(positive1, OUTPUT);
   pinMode(negative1, OUTPUT);
@@ -83,6 +90,7 @@ void setup() {
   PID1.setTimeStep(MILLIS_MULTIPLIER * (SCAN_TIME + SCAN_TIME_OFFSET));
 
   SPI.begin();
+  sensor.begin();
   rfid.PCD_Init();
 
   for (byte i = 0; i < 6; i++) {
@@ -109,8 +117,10 @@ void reset() {
   iterations1 = 0;
 }
 
-void scanTemp1() {    
-  poolValues1 += map(analogRead(1), maxTempCalib1, minTempCalib1, 1000, 0) / 10;
+void scanTemp1() {
+  sensor.requestTemperatures();
+  while (!sensor.isConversionComplete());  // wait until sensor is ready
+  poolValues1 += sensor.getTempC();
   iterations1++;
 }
 
