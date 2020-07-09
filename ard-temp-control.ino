@@ -7,7 +7,7 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 25 // °C
+#define TARGET 28 // °C
 #define SS_PIN 10
 #define RST_PIN 9
 #define FAN_OFFSET 20
@@ -31,10 +31,6 @@ int rele2 = 4;
 /* Door Sensor */
 int door1 = 5;
 
-/* Conversion */
-const int maxTempCalib1 = 855;
-const int minTempCalib1 = 638;
-
 /* Time vars */
 unsigned long actTime = 0;
 unsigned long readTempTimeout1 = 0;
@@ -47,7 +43,7 @@ float temp1 = 0;
 
 String inputString = "";
 bool stringComplete = false;
-const int maxTemp = 100;
+const int maxTemp = 125;
 bool isEEPROMEmpty = false;
 
 /* PID */
@@ -108,7 +104,7 @@ void loop() {
   scanTemp1();
   pid1();
   readCard();
-  stanDoor();
+  scanDoor();
   scanSerial();
 } 
 
@@ -124,7 +120,7 @@ void scanTemp1() {
   iterations1++;
 }
 
-void stanDoor() {
+void scanDoor() {
   if(digitalRead(door1) && !dark) {
     releOn(rele2);
   } else {
@@ -146,7 +142,10 @@ void commands(String command) {
   }
   if (inputString.equals("lon\r\n")) {
     dark = false;
-  }  
+  }
+  if (inputString.equals("open\r\n")) {
+    setDoorTimeout();
+  }
 }
 
 void pid1() {
@@ -200,7 +199,7 @@ void readCard() {
   }
   
   if (compareData(rfid.uid.uidByte, rfid.uid.size)) {
-    openDoorTimeout = actTime + (DOOR_TIMEOUT * MILLIS_MULTIPLIER);
+    setDoorTimeout();
   }
 
   // Halt PICC
@@ -208,6 +207,10 @@ void readCard() {
 
   // Stop encryption on PCD
   rfid.PCD_StopCrypto1();
+}
+
+void setDoorTimeout() {
+  openDoorTimeout = actTime + (DOOR_TIMEOUT * MILLIS_MULTIPLIER);
 }
 
 void openDoor() {
