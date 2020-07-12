@@ -7,10 +7,10 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 28 // °C
+#define TARGET 30 // °C
 #define SS_PIN 10
 #define RST_PIN 9
-#define FAN_OFFSET 20
+#define FAN_OFFSET 25
 #define SCAN_TIME 15 // Seconds
 #define SCAN_TIME_OFFSET 5
 #define DOOR_TIMEOUT 5
@@ -168,14 +168,21 @@ void pid1() {
 void ploter1() {
   if (actTime >= readTempTimeout1) {
     temp1 = (poolValues1/iterations1);
+    float output = Output1;
+    if (output < FAN_OFFSET) {
+      output = FAN_OFFSET;
+    }
     reset();
-    Serial.print ("T");
-    Serial.print (temp1, 2);
-    Serial.print (",B");
-    Serial.println (Output1, 2);
-    Serial.print (temp1, 2);
-    Serial.print (",");
-    Serial.println (Output1 / 10, 2);
+    if(temp1) {
+      Serial.print ("T");
+      Serial.print (temp1, 2);
+      Serial.print (",B");
+      Serial.println (output, 2);
+      Serial.print (temp1, 2);
+      Serial.print (",");
+      Serial.println (output / 10, 2);
+    }
+    
     readTempTimeout1 = actTime + (MILLIS_MULTIPLIER * SCAN_TIME);
   }
 }
