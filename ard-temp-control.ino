@@ -173,7 +173,7 @@ void ploter1() {
       output = FAN_OFFSET;
     }
     reset();
-    if(temp1) {
+    if(!isnan(temp1)) {
       Serial.print ("T");
       Serial.print (temp1, 2);
       Serial.print (",B");
