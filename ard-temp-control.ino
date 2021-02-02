@@ -7,7 +7,7 @@
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define TARGET 30 // °C
+#define TARGET 23 // °C
 #define SS_PIN 10
 #define RST_PIN 9
 #define FAN_OFFSET 25
@@ -43,7 +43,7 @@ float temp1 = 0;
 
 String inputString = "";
 bool stringComplete = false;
-const int maxTemp = 125;
+const int maxTemp = 60;
 bool isEEPROMEmpty = false;
 
 /* PID */
